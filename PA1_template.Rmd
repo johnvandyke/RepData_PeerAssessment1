@@ -1,25 +1,136 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+# Coursera Reproducable Research Assignment 1
 
 
-## Loading and preprocessing the data
+### Loading and Processing the data
+
+Loading the ggplot, lattice, and plyr packages.  These packages will be used
+throughout the analysis.
+``` {r echo = TRUE}
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(lattice)
+```
+
+Setting the working directory then downloading the dataset.
+
+``` {r echo = TRUE}
+setwd("C:/Users/John/Documents/Coursera/reproducibleresearch/project1")
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+path <- getwd()
+download.file(url,destfile=file.path(path, "Activity monitoring data.zip"))
+unzip(zipfile = "Activity monitoring data.zip")
+activitydata <-read.csv("activity.csv")
+```
+###What is mean total number of steps taken per day?
+
+Aggregating the dataset in order to find the average number of steps per day.
+```{r echo = TRUE}
+avgTable <- aggregate(activitydata$steps ~ activitydata$date, FUN=sum, )
+colnames(avgTable)<- c("Date", "Steps")
+```
+
+Creating a histogram of the average number of steps per day.
+```{r echo = TRUE}
+hist(avgTable$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day")
+```
+
+Displaying mean and median summary statistics.
+```{r echo = TRUE}
+as.integer(mean(avgTable$Steps))
+as.integer(median(avgTable$Steps))
+```
+
+### What is the average daily activity pattern?
+
+Using previously stored data, remove any NA values and create a clean 
+table for the average number of steps.
+```{r echo = TRUE}
+clean <- activitydata[!is.na(activitydata$steps),]
+cleanTable <- ddply(clean, .(interval), summarize, Avg = mean(steps))
+```
+
+Create a ggplot line graph (best way to plot time-series data) to display
+number of average steps per interval.
+``` {r echo = TRUE}
+p <- ggplot(cleanTable, aes(x=interval, y=Avg), xlab = "Interval", ylab="Average Number of Steps")
+p + geom_line()+xlab("Interval")+ylab("Average Number of Steps")+ggtitle("Average Number of Steps per Interval")
+```
+
+Maximum number of steps per interval:
+``` {r echo = TRUE}
+maxSteps <- max(cleanTable$Avg)
+```
+Which interval contains the maximum average number of steps?
+``` {r echo = TRUE}
+cleanTable[cleanTable$Avg==maxSteps,1]
+```
+
+### Imputing Missing Values
+
+Calculate and report the total number of missing values in the dataset.
+``` {r echo = TRUE}
+nrow(activitydata[is.na(activitydata$steps),])
+```
+
+My strategy for NA handling was to remove the NA values and replace them with mean values.
+``` {r echo = TRUE}
+# find positions of NA values
+napos <- which(is.na(activitydata$steps))
+# create a vector with mean values
+meanvec <- rep(mean(activitydata$steps, na.rm=TRUE), times=length(napos))
+# replace the NA values with the means
+activitydata[napos, "steps"] <- meanvec
+rm(mean_vec, na_pos)
+# calculate the total number of steps each day (NA values removed)
+sumdata <- aggregate(activitydata$steps, by=list(activitydata$date), FUN=sum)
+# Rename the variables
+colnames(sumdata) <- c("date", "total")
+```
+
+Plotting a histogram with the total number of steps taken each day.
+``` {r echo = TRUE}
+hist(sumdata$total, 
+     breaks=seq(from=0, to=25000, by=2500),
+     col="blue", 
+     xlab="Total number of steps", 
+     ylim=c(0, 30), 
+     main="Histogram of the total number of steps taken each day\n(NA replaced by mean value)")
+```
+
+Calculate summary statistics with NA values imputted
+``` {r echo = TRUE}
+mean(sumdata$total)
+median(sumdata$total)
+```
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+The Lubridate has a function that will allow us to easily convert a date to
+the corresponding day type (monday, tuesday, etc.).  This is similar
+to a date dimension table in an a data warehouse.
+``` {R echo = TRUE}
+# loading lubridate package to prase day categories based on dates
+library(lubridate)
+```
+
+Here, we will parse the date to find if it's on a weekday or weekend
+based on the date.  Then we'll summarize the data into a table
+and plot a chart.
+``` {r echo = TRUE}
+# Create new category based on the days of the week
+sumdata$DayCategory <- ifelse(wday(mdy_hms(sumdata$date), label = TRUE) %in% c("Sat", "Sun"), "weekend", "weekday")
+
+## Summarize data by interval and type of day
+catasum <- ddply(sumdata, .(interval, DayCategory), summarize, Avg = mean(total))
+
+##Plot data in a panel plot
+#xyplot(Avg~interval|DayCategory, data=catsum, type="l",  layout = c(1,2),
+#       main="Average Steps per Interval Based on Type of Day", 
+#       ylab="Average Number of Steps", xlab="Interval")
+```
 
 
 
-## What is mean total number of steps taken per day?
 
 
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
